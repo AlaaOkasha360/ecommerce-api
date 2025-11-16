@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ProductsResource;
 use App\HttpResponses;
+use App\Models\Category;
 use App\Models\Product;
 use Exception;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ class ProductController extends Controller
                     ->orWhere('description', 'LIKE', "%$search_term%");
             });
         }
-        return ProductsResource::collection($products->paginate(10));
+        return $this->product_paginate($products->paginate(10));
     }
 
     /**
@@ -42,6 +43,10 @@ class ProductController extends Controller
 
     public function product_category($category_id)
     {
-
+        $category = Category::find($category_id);
+        return response()->json([
+            'name' => $category->name,
+            'products' => $category->products,
+        ]);
     }
 }

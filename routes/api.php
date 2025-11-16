@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -22,3 +23,5 @@ Route::prefix('auth')->group(function () {
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/products/category/{id}', [ProductController::class, 'product_category']);
+Route::get('/categories', [CategoriesController::class, 'index']);
+Route::get('/categories/{id}/products', [CategoriesController::class, 'show']);
