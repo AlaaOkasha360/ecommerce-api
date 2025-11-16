@@ -42,4 +42,12 @@ class AuthController extends Controller
         Auth::user()->currentAccessToken()->delete();
         return $this->success([], 'Logout Successfully');
     }
+
+    public function me(Request $request)
+    {
+        $user = Auth::user();
+        return $this->success([
+            'user' => $user,
+        ]);
+    }
 }
