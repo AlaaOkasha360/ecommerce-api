@@ -18,13 +18,13 @@ class ProductController extends Controller
     {
         $products = Product::query();
         $search_term = $request->query('q', '');
-        if(!empty($search_term)){
-            $products->where(function($query) use ($search_term){
+        if (!empty($search_term)) {
+            $products->where(function ($query) use ($search_term) {
                 $query->where('name', 'LIKE', "%$search_term%")
-                ->orWhere('description', 'LIKE', "%$search_term%");
+                    ->orWhere('description', 'LIKE', "%$search_term%");
             });
         }
-        return ProductsResource::collection($products->get());
+        return ProductsResource::collection($products->paginate(10));
     }
 
     /**
