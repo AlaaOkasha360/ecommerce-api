@@ -11,21 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('order_items', function (Blueprint $table) {
+        Schema::create('product_images', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('order_id')
-                  ->constrained('orders')
-                  ->onDelete('cascade');
             $table->foreignId('product_id')
                   ->constrained('products')
-                  ->restrictOnDelete();
-            $table->string('product_name', 255);
-            $table->string('product_sku', 100);
-            $table->integer('quantity');
-            $table->decimal('price');
-            $table->decimal('subtotal');
+                  ->onDelete('cascade');
+            $table->string('image_url', 500);
+            $table->string('alt_text', 255)->nullable();
+            $table->boolean('is_primary')->default(false);
+            $table->integer('sort_order')->default(0);
             $table->timestamps();
-            $table->index('order_id', 'idx_order_id');
             $table->index('product_id', 'idx_product_id');
         });
     }
@@ -35,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('order_items');
+        Schema::dropIfExists('product_images');
     }
 };

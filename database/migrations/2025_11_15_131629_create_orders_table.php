@@ -13,13 +13,28 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->enum('status', ['pending', 'shipped', 'delivered']);
-            $table->decimal('total');
-            $table->enum('payment_status', ['pending', 'paid', 'refunded']);
-            $table->foreign('user_id')
-                ->references('id')
-                ->on('users');
+            $table->foreignId('user_id')
+                  ->constrained('users')
+                  ->restrictOnDelete();
+            $table->foreignId('shipping_address_id')
+                  ->constrained('addresses');
+            $table->foreignId('billing_address_id')
+                  ->constrained('addresses');
+            $table->string('order_number', 50)->unique();
+            $table->enum('status', ['pending', 'processing', 'shipped', 'delivered', 'cancelled'])
+                  ->default('pending');
+            $table->decimal('subtotal');
+            $table->decimal('tax')->default(0);
+            $table->decimal('shipping_cost')->default(0);
+            $table->decimal('total_amount');
+            $table->enum('payment_status', ['pending', 'paid', 'failed', 'refunded'])
+                  ->default('pending');
+            $table->string('payment_method', 50)->nullable();
+            $table->text('notes')->nullable();
+            $table->index('user_id', 'idx_user_id');
+            $table->index('order_number', 'idx_order_number');
+            $table->index('status', 'idx_status');
+            $table->index('payment_status', 'idx_payment_status');
             $table->timestamps();
         });
     }
