@@ -7,13 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
 
-    protected function category(){
+    public function category(){
         return $this->belongsTo(Category::class);
     }
-    protected function orderItems(){
+    public function orderItems(){
         return $this->hasMany(Order_item::class);
     }
-    protected function cartItems(){
+    public function cartItems(){
         return $this->hasMany(Cart_item::class);
+    }
+    public function product_image(){
+        return $this->hasMany(ProductImage::class);
     }
 }

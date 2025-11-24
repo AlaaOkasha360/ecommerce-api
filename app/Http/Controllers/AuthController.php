@@ -8,6 +8,7 @@ use App\HttpResponses;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\Controller;
 
@@ -29,7 +30,7 @@ class AuthController extends Controller
             'user' => $user,
             'access_token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => auth()->factory()->getTTL() * 24 * 60
+            'expires_in' => JWTAuth::factory()->getTTL() * 60
         ], 'Registered Successfully', 201);
     }
 
@@ -41,10 +42,10 @@ class AuthController extends Controller
             return $this->error([], "Credentials do not match", 401);
         }
         return $this->success([
-            'user' => Auth::guard('api')->user(),
+            'user' => Auth::guard()->user(),
             'access_token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => auth('api')->factory()->getTTL() * 60 * 24
+            'expires_in' => JWTAuth::factory()->getTTL() * 60
         ], 'Logged in successfully');
     }
 
@@ -68,7 +69,7 @@ class AuthController extends Controller
         return $this->success([
             'access_token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => auth()->factory()->getTTL() * 24 * 60
+            'expires_in' => JWTAuth::factory()->getTTL() * 60
         ], 'Token refreshed successfully');
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Resources\ProductsResource;
 use App\HttpResponses;
 use App\Models\Category;
 use App\Models\Product;
+use Auth;
 use Exception;
 use Illuminate\Http\Request;
 
@@ -17,6 +18,9 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
+        if (!Auth::user()->role == 'admin') {
+            return $this->error([], 'You are not authorized to do this request');
+        }
         $products = Product::query();
         $search_term = $request->query('q', '');
         if (!empty($search_term)) {

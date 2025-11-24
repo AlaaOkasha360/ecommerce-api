@@ -8,10 +8,10 @@ class Cart_item extends Model
 {
 
 
-    protected function cart(){
+    public function cart(){
         return $this->belongsTo(Cart::class);
     }
-    protected function product(){
+    public function product(){
         return $this->belongsTo(Product::class);
     }
 }
