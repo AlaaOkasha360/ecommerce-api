@@ -50,7 +50,11 @@ Route::prefix('products')->group(function () {
 
 });
 
-// Public categories routes
-Route::get('/categories', [CategoriesController::class, 'index']);
-Route::get('/categories/{id}/products', [CategoriesController::class, 'show']);
-
+// Category routes
+Route::prefix('categories')->group(function () {
+    Route::get('', [CategoriesController::class, 'index']);
+    Route::get('/{category}', [CategoriesController::class, 'show']);
+    Route::post('', [CategoriesController::class, 'store'])->middleware(['auth:api', 'admin']);
+    Route::put('/{category}', [CategoriesController::class, 'update'])->middleware(['auth:api', 'admin']);
+    Route::delete('/{category}', [CategoriesController::class, 'destroy'])->middleware(['auth:api', 'admin']);
+});
