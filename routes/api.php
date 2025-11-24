@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UserController;
@@ -57,4 +58,14 @@ Route::prefix('categories')->group(function () {
     Route::post('', [CategoriesController::class, 'store'])->middleware(['auth:api', 'admin']);
     Route::put('/{category}', [CategoriesController::class, 'update'])->middleware(['auth:api', 'admin']);
     Route::delete('/{category}', [CategoriesController::class, 'destroy'])->middleware(['auth:api', 'admin']);
+});
+
+// Shopping Cart routes
+Route::middleware('auth:api')->group(function () {
+    Route::get('/cart', [CartController::class, 'index']);
+    Route::post('/cart/items', [CartController::class, 'addItem']);
+    Route::put('/cart/items/{item}', [CartController::class, 'updateItem']);
+    Route::delete('/cart/items/{item}', [CartController::class, 'removeItem']);
+    Route::delete('/cart', [CartController::class, 'clearCart']);
+    Route::get('/cart/total', [CartController::class, 'getTotal']);
 });
