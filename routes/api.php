@@ -39,9 +39,12 @@ Route::group(['middleware' => ['auth:api', 'admin'], 'prefix' => 'admin'], funct
 // Public product routes
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
+    Route::post('/', [ProductController::class, 'store'])->middleware(['auth:api', 'admin']);
     Route::get('/search', [ProductController::class, 'search']);
     Route::get('/category/{slug}', [ProductController::class, 'product_category']);
     Route::get('/{product}', [ProductController::class, 'show']);
+    Route::put('/{product}', [ProductController::class, 'update'])->middleware(['auth:api', 'admin']);
+    Route::delete('/{product}', [ProductController::class, 'destroy'])->middleware(['auth:api', 'admin']);
     Route::get('/{product}/reviews', [ProductController::class, 'product_reviews']);
     Route::post('/{product}/reviews', [ProductController::class, 'store_review'])->middleware('auth:api');
 

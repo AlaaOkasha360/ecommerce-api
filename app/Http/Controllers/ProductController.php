@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Resources\ProductsResource;
 use App\Http\Resources\ReviewsResource;
@@ -21,8 +22,8 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $products = Product::all();
-        return $this->product_paginate($products->paginate(10));
+        $products = Product::paginate(10);
+        return $this->product_paginate($products);
     }
 
     /**
@@ -75,5 +76,23 @@ class ProductController extends Controller
             'comment' => $validated['comment']
         ]);
         return new ReviewsResource($review);
+    }
+
+    public function store(StoreProductRequest $request)
+    {
+        $validated = $request->validated();
+        $product = Product::create($validated);
+        return new ProductsResource($product);
+    }
+
+    public function update(Request $request, Product $product)
+    {
+        $product->update($request->all());
+        return new ProductsResource($product);
+    }
+
+    public function destroy(Product $product)
+    {
+        return $product->delete();
     }
 }
