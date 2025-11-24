@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ProductController;
@@ -17,7 +18,7 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-Route::group(['middleware'=>'auth:api', 'prefix'=>'users'], function(){
+Route::group(['middleware' => 'auth:api', 'prefix' => 'users'], function () {
     Route::get('/profile', [UserController::class, 'show_profile']);
     Route::put('/profile', [UserController::class, 'update_profile']);
     Route::get('/addresses', [UserController::class, 'show_addresses']);
@@ -28,8 +29,11 @@ Route::group(['middleware'=>'auth:api', 'prefix'=>'users'], function(){
     Route::get('/orders/{order}', [UserController::class, 'show_order']);
 });
 
-Route::group(['middleware'=>['auth:api', 'admin'], 'prefix'=>'admin'], function(){
-    Route::get('/users', []);
+Route::group(['middleware' => ['auth:api', 'admin'], 'prefix' => 'admin'], function () {
+    Route::get('/users', [AdminController::class, 'index']);
+    Route::get('/users/{user}', [AdminController::class, 'show']);
+    Route::put('/users/{user}', [AdminController::class, 'update']);
+    Route::delete('/users/{user}', [AdminController::class, 'destroy']);
 });
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);

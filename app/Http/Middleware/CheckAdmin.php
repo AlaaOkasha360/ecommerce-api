@@ -18,9 +18,16 @@ class CheckAdmin
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (Auth::check() && Auth::user()->role === 'admin') {
-            return $next($request);
+        $user = Auth::user();
+
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'status' => 'An error occurred',
+                'message' => 'Unauthorized - Admin access required',
+                'data' => []
+            ], 403);
         }
-        return $this->error([], "Unauthorized Access");
+
+        return $next($request);
     }
 }
