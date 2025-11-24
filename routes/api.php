@@ -35,8 +35,19 @@ Route::group(['middleware' => ['auth:api', 'admin'], 'prefix' => 'admin'], funct
     Route::put('/users/{user}', [AdminController::class, 'update']);
     Route::delete('/users/{user}', [AdminController::class, 'destroy']);
 });
-Route::get('/products', [ProductController::class, 'index']);
-Route::get('/products/{id}', [ProductController::class, 'show']);
-Route::get('/products/category/{id}', [ProductController::class, 'product_category']);
+
+// Public product routes
+Route::prefix('products')->group(function () {
+    Route::get('/', [ProductController::class, 'index']);
+    Route::get('/search', [ProductController::class, 'search']);
+    Route::get('/category/{slug}', [ProductController::class, 'product_category']);
+    Route::get('/{product}', [ProductController::class, 'show']);
+    Route::get('/{product}/reviews', [ProductController::class, 'product_reviews']);
+    Route::post('/{product}/reviews', [ProductController::class, 'store_review'])->middleware('auth:api');
+
+});
+
+// Public categories routes
 Route::get('/categories', [CategoriesController::class, 'index']);
 Route::get('/categories/{id}/products', [CategoriesController::class, 'show']);
+
