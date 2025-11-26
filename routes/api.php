@@ -4,6 +4,8 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoriesController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -68,4 +70,25 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/cart/items/{item}', [CartController::class, 'removeItem']);
     Route::delete('/cart', [CartController::class, 'clearCart']);
     Route::get('/cart/total', [CartController::class, 'getTotal']);
+});
+
+// Order routes
+Route::middleware('auth:api')->group(function () {
+    Route::post('/orders', [OrderController::class, 'createOrder']);
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{order}', [OrderController::class, 'show']);
+    Route::put('/orders/{order}/cancel', [OrderController::class, 'cancel']);
+});
+
+// Admin order routes
+Route::middleware(['auth:api', 'admin'])->group(function () {
+    Route::put('/admin/orders/{order}/status', [OrderController::class, 'updateStatus']);
+});
+
+// Payment routes (webhook must be public for Stripe)
+Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
+
+Route::middleware('auth:api')->prefix('payments')->group(function () {
+    Route::post('/create-intent', [PaymentController::class, 'createIntent']);
+    Route::post('/confirm', [PaymentController::class, 'confirmPayment']);
 });
