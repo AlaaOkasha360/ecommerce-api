@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoriesController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
@@ -13,15 +14,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::middleware(['auth:api'])->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->middleware('verified.api');
+    Route::middleware(['auth:api', 'verified.api'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
         Route::get('/me', [AuthController::class, 'me']);
     });
 });
 
-Route::group(['middleware' => 'auth:api', 'prefix' => 'users'], function () {
+Route::group(['middleware' => ['auth:api', 'verified.api'], 'prefix' => 'users'], function () {
     Route::get('/profile', [UserController::class, 'show_profile']);
     Route::put('/profile', [UserController::class, 'update_profile']);
     Route::get('/addresses', [UserController::class, 'show_addresses']);
@@ -49,7 +50,7 @@ Route::prefix('products')->group(function () {
     Route::put('/{product}', [ProductController::class, 'update'])->middleware(['auth:api', 'admin']);
     Route::delete('/{product}', [ProductController::class, 'destroy'])->middleware(['auth:api', 'admin']);
     Route::get('/{product}/reviews', [ProductController::class, 'product_reviews']);
-    Route::post('/{product}/reviews', [ProductController::class, 'store_review'])->middleware('auth:api');
+    Route::post('/{product}/reviews', [ProductController::class, 'store_review'])->middleware('auth:api', 'verified.api');
 
 });
 
@@ -63,7 +64,7 @@ Route::prefix('categories')->group(function () {
 });
 
 // Shopping Cart routes
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'verified.api'])->group(function () {
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart/items', [CartController::class, 'addItem']);
     Route::put('/cart/items/{item}', [CartController::class, 'updateItem']);
@@ -73,7 +74,7 @@ Route::middleware('auth:api')->group(function () {
 });
 
 // Order routes
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'verified.api'])->group(function () {
     Route::post('/orders', [OrderController::class, 'createOrder']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{order}', [OrderController::class, 'show']);
@@ -88,7 +89,19 @@ Route::middleware(['auth:api', 'admin'])->group(function () {
 // Payment routes (webhook must be public for Stripe)
 Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
 
-Route::middleware('auth:api')->prefix('payments')->group(function () {
-    Route::post('/create-intent', [PaymentController::class, 'createIntent']);
-    Route::post('/confirm', [PaymentController::class, 'confirmPayment']);
+Route::middleware(['auth:api', 'verified.api'])->prefix('payments')->group(function () {
+    Route::post('/create-checkout', [PaymentController::class, 'createCheckoutSession']);
+    Route::post('/verify-session', [PaymentController::class, 'verifySession']);
 });
+
+// Public success/cancel pages
+Route::get('/payments/success', function () {
+    return 'Payment completed successfully! You can close this window.';
+})->name('payment.success');
+
+Route::get('/payments/cancel', function () {
+    return 'Payment was cancelled. Please try again.';
+})->name('payment.cancel');
+
+Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'emailVerify'])->middleware(['signed'])->name('verification.verify');
+Route::post('/email/resend', [EmailVerificationController::class, 'resend'])->middleware('auth:api');

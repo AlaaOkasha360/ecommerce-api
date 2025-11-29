@@ -14,7 +14,6 @@ use App\Models\Order_item;
 use Auth;
 use DB;
 use Illuminate\Http\Request;
-use Stripe\StripeClient;
 
 class OrderController extends Controller
 {
@@ -86,14 +85,6 @@ class OrderController extends Controller
             // Clear cart
             $cart->cartItems()->delete();
 
-            // Create Stripe payment intent
-            $stripe = new StripeClient(env('STRIPE_SECRET'));
-            $paymentIntent = $stripe->paymentIntents->create([
-                'amount' => round($total * 100), // Stripe uses cents
-                'currency' => 'usd',
-                'metadata' => ['order_id' => $order->id]
-            ]);
-
             DB::commit();
 
             // Load relationships
@@ -140,9 +131,8 @@ class OrderController extends Controller
                     'created_at' => $order->created_at,
                 ],
                 'next_step' => [
-                    'action' => 'payment',
-                    'payment_intent_id' => $paymentIntent->id,
-                    'client_secret' => $paymentIntent->client_secret,
+                    'action' => 'create_checkout_session',
+                    'message' => 'Use POST /api/payments/create-checkout with order_id to initiate payment'
                 ]
             ], 'Order created successfully', 201);
 

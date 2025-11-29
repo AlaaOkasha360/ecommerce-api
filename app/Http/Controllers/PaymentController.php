@@ -14,17 +14,15 @@ class PaymentController extends Controller
     use HttpResponses;
 
     /**
-     * Create payment intent
+     * Create checkout session
      */
-    public function createIntent(Request $request)
+    public function createCheckoutSession(Request $request)
     {
         $validated = $request->validate([
-            'order_id' => ['required', 'integer', 'exists:orders,id'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'currency' => ['required', 'string', 'size:3']
+            'order_id' => ['required', 'integer', 'exists:orders,id']
         ]);
 
-        $order = Order::findOrFail($validated['order_id']);
+        $order = Order::with('items')->findOrFail($validated['order_id']);
         $user = auth()->user();
 
         if ($order->user_id !== $user->id) {
@@ -33,59 +31,106 @@ class PaymentController extends Controller
 
         try {
             $stripe = new StripeClient(env('STRIPE_SECRET'));
-            $paymentIntent = $stripe->paymentIntents->create([
-                'amount' => round($validated['amount'] * 100), // Convert to cents
-                'currency' => strtolower($validated['currency']),
+
+            // Prepare line items from order
+            $lineItems = $order->items->map(function ($item) {
+                return [
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => $item->product_name,
+                            'description' => 'SKU: ' . $item->product_sku,
+                        ],
+                        'unit_amount' => round($item->price * 100), // Convert to cents
+                    ],
+                    'quantity' => $item->quantity,
+                ];
+            })->toArray();
+
+            // Add tax as line item
+            if ($order->tax > 0) {
+                $lineItems[] = [
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => 'Tax',
+                        ],
+                        'unit_amount' => round($order->tax * 100),
+                    ],
+                    'quantity' => 1,
+                ];
+            }
+
+            // Add shipping as line item
+            if ($order->shipping_cost > 0) {
+                $lineItems[] = [
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => 'Shipping',
+                        ],
+                        'unit_amount' => round($order->shipping_cost * 100),
+                    ],
+                    'quantity' => 1,
+                ];
+            }
+
+            $session = $stripe->checkout->sessions->create([
+                'payment_method_types' => ['card'],
+                'line_items' => $lineItems,
+                'mode' => 'payment',
+                'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('payment.cancel') . '?order_id=' . $order->id,
                 'metadata' => [
                     'order_id' => $order->id,
                     'order_number' => $order->order_number,
-                ]
+                ],
+                'client_reference_id' => $order->order_number,
             ]);
 
             return $this->success([
-                'payment_intent_id' => $paymentIntent->id,
-                'client_secret' => $paymentIntent->client_secret,
-                'amount' => $validated['amount'],
-                'currency' => strtoupper($validated['currency']),
-                'status' => $paymentIntent->status,
+                'session_id' => $session->id,
+                'checkout_url' => $session->url,
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
             ]);
         } catch (\Exception $e) {
-            return $this->error([], 'Failed to create payment intent: ' . $e->getMessage(), 500);
+            return $this->error([], 'Failed to create checkout session: ' . $e->getMessage(), 500);
         }
     }
 
     /**
-     * Confirm payment
+     * Verify checkout session
      */
-    public function confirmPayment(Request $request)
+    public function verifySession(Request $request)
     {
         $validated = $request->validate([
-            'payment_intent_id' => ['required', 'string'],
-            'order_id' => ['required', 'integer', 'exists:orders,id']
+            'session_id' => ['required', 'string']
         ]);
-
-        $order = Order::findOrFail($validated['order_id']);
-        $user = auth()->user();
-
-        if ($order->user_id !== $user->id) {
-            return $this->error([], 'Unauthorized', 403);
-        }
 
         try {
             $stripe = new StripeClient(env('STRIPE_SECRET'));
-            $paymentIntent = $stripe->paymentIntents->retrieve($validated['payment_intent_id']);
+            $session = $stripe->checkout->sessions->retrieve($validated['session_id']);
 
-            if ($paymentIntent->status === 'succeeded') {
+            if ($session->payment_status === 'paid') {
+                $orderId = $session->metadata->order_id ?? null;
+
+                if (!$orderId) {
+                    return $this->error([], 'Order not found in session metadata', 400);
+                }
+
+                $order = Order::findOrFail($orderId);
+
                 // Create or update payment record
                 $payment = Payment::updateOrCreate(
                     ['order_id' => $order->id],
                     [
-                        'stripe_payment_id' => $paymentIntent->latest_charge ?? null,
-                        'stripe_payment_intent' => $paymentIntent->id,
-                        'amount' => $paymentIntent->amount / 100,
-                        'currency' => strtoupper($paymentIntent->currency),
+                        'stripe_payment_id' => $session->payment_intent,
+                        'stripe_payment_intent' => $session->id,
+                        'amount' => $session->amount_total / 100,
+                        'currency' => strtoupper($session->currency),
                         'status' => 'succeeded',
-                        'payment_method_type' => $paymentIntent->payment_method_types[0] ?? 'card'
+                        'payment_method_type' => 'card'
                     ]
                 );
 
@@ -99,11 +144,9 @@ class PaymentController extends Controller
                         'id' => $payment->id,
                         'order_id' => $payment->order_id,
                         'stripe_payment_id' => $payment->stripe_payment_id,
-                        'stripe_payment_intent' => $payment->stripe_payment_intent,
                         'amount' => $payment->amount,
                         'currency' => $payment->currency,
                         'status' => $payment->status,
-                        'payment_method_type' => $payment->payment_method_type,
                     ],
                     'order' => [
                         'id' => $order->id,
@@ -111,12 +154,12 @@ class PaymentController extends Controller
                         'status' => $order->status,
                         'payment_status' => $order->payment_status,
                     ]
-                ], 'Payment confirmed successfully');
+                ], 'Payment verified successfully');
             } else {
-                return $this->error([], 'Payment not completed yet. Status: ' . $paymentIntent->status, 400);
+                return $this->error([], 'Payment not completed. Status: ' . $session->payment_status, 400);
             }
         } catch (\Exception $e) {
-            return $this->error([], 'Failed to confirm payment: ' . $e->getMessage(), 500);
+            return $this->error([], 'Failed to verify session: ' . $e->getMessage(), 500);
         }
     }
 
@@ -139,24 +182,24 @@ class PaymentController extends Controller
 
         // Handle the event
         switch ($event->type) {
-            case 'payment_intent.succeeded':
-                $paymentIntent = $event->data->object;
-                $this->handlePaymentSuccess($paymentIntent);
+            case 'checkout.session.completed':
+                $session = $event->data->object;
+                $this->handleCheckoutCompleted($session);
                 break;
 
-            case 'payment_intent.payment_failed':
-                $paymentIntent = $event->data->object;
-                $this->handlePaymentFailed($paymentIntent);
+            case 'checkout.session.async_payment_succeeded':
+                $session = $event->data->object;
+                $this->handleCheckoutCompleted($session);
+                break;
+
+            case 'checkout.session.async_payment_failed':
+                $session = $event->data->object;
+                $this->handlePaymentFailed($session);
                 break;
 
             case 'charge.refunded':
                 $charge = $event->data->object;
                 $this->handleRefund($charge);
-                break;
-
-            case 'payment_intent.canceled':
-                $paymentIntent = $event->data->object;
-                $this->handlePaymentCanceled($paymentIntent);
                 break;
 
             default:
@@ -167,28 +210,32 @@ class PaymentController extends Controller
         return response()->json(['received' => true]);
     }
 
-    private function handlePaymentSuccess($paymentIntent)
+    private function handleCheckoutCompleted($session)
     {
-        $orderId = $paymentIntent->metadata->order_id ?? null;
-        if (!$orderId)
+        $orderId = $session->metadata->order_id ?? null;
+        if (!$orderId) {
             return;
+        }
 
         $order = Order::find($orderId);
-        if (!$order)
+        if (!$order) {
             return;
+        }
 
+        // Create or update payment record
         Payment::updateOrCreate(
             ['order_id' => $order->id],
             [
-                'stripe_payment_id' => $paymentIntent->latest_charge ?? null,
-                'stripe_payment_intent' => $paymentIntent->id,
-                'amount' => $paymentIntent->amount / 100,
-                'currency' => strtoupper($paymentIntent->currency),
+                'stripe_payment_id' => $session->payment_intent,
+                'stripe_payment_intent' => $session->id,
+                'amount' => $session->amount_total / 100,
+                'currency' => strtoupper($session->currency),
                 'status' => 'succeeded',
-                'payment_method_type' => $paymentIntent->payment_method_types[0] ?? 'card'
+                'payment_method_type' => 'card'
             ]
         );
 
+        // Update order status
         $order->payment_status = 'paid';
         $order->status = 'processing';
         $order->save();
@@ -196,22 +243,24 @@ class PaymentController extends Controller
         // TODO: Send confirmation email
     }
 
-    private function handlePaymentFailed($paymentIntent)
+    private function handlePaymentFailed($session)
     {
-        $orderId = $paymentIntent->metadata->order_id ?? null;
-        if (!$orderId)
+        $orderId = $session->metadata->order_id ?? null;
+        if (!$orderId) {
             return;
+        }
 
         $order = Order::find($orderId);
-        if (!$order)
+        if (!$order) {
             return;
+        }
 
         Payment::updateOrCreate(
             ['order_id' => $order->id],
             [
-                'stripe_payment_intent' => $paymentIntent->id,
-                'amount' => $paymentIntent->amount / 100,
-                'currency' => strtoupper($paymentIntent->currency),
+                'stripe_payment_intent' => $session->id,
+                'amount' => $session->amount_total / 100,
+                'currency' => strtoupper($session->currency),
                 'status' => 'failed',
             ]
         );
@@ -222,9 +271,10 @@ class PaymentController extends Controller
 
     private function handleRefund($charge)
     {
-        $payment = Payment::where('stripe_payment_id', $charge->id)->first();
-        if (!$payment)
+        $payment = Payment::where('stripe_payment_id', $charge->payment_intent)->first();
+        if (!$payment) {
             return;
+        }
 
         $payment->status = 'refunded';
         $payment->save();
@@ -234,25 +284,5 @@ class PaymentController extends Controller
             $order->payment_status = 'refunded';
             $order->save();
         }
-    }
-
-    private function handlePaymentCanceled($paymentIntent)
-    {
-        $orderId = $paymentIntent->metadata->order_id ?? null;
-        if (!$orderId)
-            return;
-
-        $order = Order::find($orderId);
-        if (!$order)
-            return;
-
-        $payment = Payment::where('order_id', $order->id)->first();
-        if ($payment) {
-            $payment->status = 'cancelled';
-            $payment->save();
-        }
-
-        $order->payment_status = 'failed';
-        $order->save();
     }
 }

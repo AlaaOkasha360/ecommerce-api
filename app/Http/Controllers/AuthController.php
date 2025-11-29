@@ -6,6 +6,7 @@ use App\Http\Requests\LoginUserRequest;
 use App\Http\Requests\StoreUserRequest;
 use App\HttpResponses;
 use App\Models\User;
+use App\Notifications\VerifyEmailApi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
@@ -25,13 +26,16 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
             'phone_number' => $validated['phone_number']
         ]);
+
+        $user->notify(new VerifyEmailApi());
+        
         $token = Auth::attempt(['email' => $validated['email'], 'password' => $validated['password']]);
         return $this->success([
             'user' => $user,
             'access_token' => $token,
             'token_type' => 'bearer',
             'expires_in' => JWTAuth::factory()->getTTL() * 60
-        ], 'Registered Successfully', 201);
+        ], 'Registered Successfully. Please verify your email', 201);
     }
 
     public function login(LoginUserRequest $request)
