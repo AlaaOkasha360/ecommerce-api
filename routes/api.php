@@ -83,6 +83,8 @@ Route::middleware(['auth:api', 'verified.api'])->group(function () {
 
 // Admin order routes
 Route::middleware(['auth:api', 'admin'])->group(function () {
+    Route::get('/admin/orders', [OrderController::class, 'adminIndex']);
+    Route::get('/admin/orders/{order}', [OrderController::class, 'adminShow']);
     Route::put('/admin/orders/{order}/status', [OrderController::class, 'updateStatus']);
 });
 

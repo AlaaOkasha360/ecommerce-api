@@ -210,6 +210,102 @@ class OrderController extends Controller
     }
 
     /**
+     * Admin: Get all orders
+     */
+    public function adminIndex(Request $request)
+    {
+        $query = Order::with(['user', 'items', 'shippingAddress', 'billingAddress']);
+
+        if ($request->status && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        $orders = $query->orderBy('created_at', 'desc')
+            ->paginate($request->per_page ?? 20);
+
+        return $this->success([
+            'orders' => $orders->map(function ($order) {
+                return [
+                    'id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'user' => $order->user ? [
+                        'id' => $order->user->id,
+                        'first_name' => $order->user->first_name,
+                        'last_name' => $order->user->last_name,
+                        'email' => $order->user->email,
+                    ] : null,
+                    'status' => $order->status,
+                    'payment_status' => $order->payment_status,
+                    'payment_method' => $order->payment_method,
+                    'total_amount' => $order->total_amount,
+                    'items_count' => $order->items->count(),
+                    'created_at' => $order->created_at,
+                ];
+            }),
+            'pagination' => [
+                'current_page' => $orders->currentPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+                'total_pages' => $orders->lastPage(),
+            ]
+        ]);
+    }
+
+    /**
+     * Admin: Get single order details
+     */
+    public function adminShow(Order $order)
+    {
+        $order->load(['user', 'items.product', 'shippingAddress', 'billingAddress', 'payments']);
+
+        return $this->success([
+            'id' => $order->id,
+            'order_number' => $order->order_number,
+            'user' => $order->user ? [
+                'id' => $order->user->id,
+                'first_name' => $order->user->first_name,
+                'last_name' => $order->user->last_name,
+                'email' => $order->user->email,
+                'phone_number' => $order->user->phone_number,
+            ] : null,
+            'status' => $order->status,
+            'payment_status' => $order->payment_status,
+            'payment_method' => $order->payment_method,
+            'subtotal' => $order->subtotal,
+            'tax' => $order->tax,
+            'shipping' => $order->shipping,
+            'total_amount' => $order->total_amount,
+            'shipping_address' => $order->shippingAddress ? [
+                'street_address' => $order->shippingAddress->street_address,
+                'city' => $order->shippingAddress->city,
+                'state' => $order->shippingAddress->state,
+                'postal_code' => $order->shippingAddress->postal_code,
+                'country' => $order->shippingAddress->country,
+            ] : null,
+            'billing_address' => $order->billingAddress ? [
+                'street_address' => $order->billingAddress->street_address,
+                'city' => $order->billingAddress->city,
+                'state' => $order->billingAddress->state,
+                'postal_code' => $order->billingAddress->postal_code,
+                'country' => $order->billingAddress->country,
+            ] : null,
+            'items' => $order->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product_name' => $item->product?->name ?? 'Unknown Product',
+                    'quantity' => $item->quantity,
+                    'price' => $item->price,
+                    'subtotal' => $item->quantity * $item->price,
+                ];
+            }),
+            'notes' => $order->notes,
+            'created_at' => $order->created_at,
+            'updated_at' => $order->updated_at,
+        ]);
+    }
+
+    /**
      * Get user's orders
      */
     public function index(Request $request)
