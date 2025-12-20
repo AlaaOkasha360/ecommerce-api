@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginUserRequest;
 use App\Http\Requests\StoreUserRequest;
 use App\HttpResponses;
+use App\Jobs\SendMailConfirmationJob;
 use App\Models\User;
 use App\Notifications\VerifyEmailApi;
 use Illuminate\Http\Request;
@@ -27,8 +28,9 @@ class AuthController extends Controller
             'phone_number' => $validated['phone_number']
         ]);
 
-        $user->notify(new VerifyEmailApi());
-        
+        // $user->notify(new VerifyEmailApi());
+        SendMailConfirmationJob::dispatch($user->id);
+
         $token = Auth::attempt(['email' => $validated['email'], 'password' => $validated['password']]);
         return $this->success([
             'user' => $user,
